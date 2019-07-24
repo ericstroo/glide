@@ -39,7 +39,7 @@ export default function (Glide, Components, Events) {
             Events.emit('run.end', this.move)
           }
 
-          if (this.isOffset()) {
+          if (this.isOffset('<') || this.isOffset('>')) {
             this._o = false
 
             Events.emit('run.offset', this.move)
@@ -60,9 +60,9 @@ export default function (Glide, Components, Events) {
     calculate () {
       const { move, length } = this
       const { steps, direction } = move
+      const { loop, perMove } = Glide.settings
 
-      // By default assume that size of view is equal to one slide
-      let viewSize = 1
+      let viewSize = steps || perMove
 
       // While direction is `=` we want jump to
       // a specified index described in steps.
@@ -88,16 +88,10 @@ export default function (Glide, Components, Events) {
         return
       }
 
-      // pagination movement
-      if (direction === '|') {
-        viewSize = Glide.settings.perView || 1
-      }
-
-      // we are moving forward
-      if (direction === '>' || (direction === '|' && steps === '>')) {
+      if (direction === '>') {
         const index = calculateForwardIndex(viewSize)
 
-        if (index > length) {
+        if (index > length && loop) {
           this._o = true
         }
 
@@ -106,11 +100,10 @@ export default function (Glide, Components, Events) {
         return
       }
 
-      // we are moving backward
-      if (direction === '<' || (direction === '|' && steps === '<')) {
+      if (direction === '<') {
         const index = calculateBackwardIndex(viewSize)
 
-        if (index < 0) {
+        if (index < 0 && loop) {
           this._o = true
         }
 
@@ -146,26 +139,8 @@ export default function (Glide, Components, Events) {
      * @param {String} direction
      * @return {Boolean}
      */
-    isOffset (direction = undefined) {
-      if (!direction) {
-        return this._o
-      }
-
-      if (!this._o) {
-        return false
-      }
-
-      // did we view to the right?
-      if (direction === '|>') {
-        return this.move.direction === '|' && this.move.steps === '>'
-      }
-
-      // did we view to the left?
-      if (direction === '|<') {
-        return this.move.direction === '|' && this.move.steps === '<'
-      }
-
-      return this.move.direction === direction
+    isOffset (direction) {
+      return this._o && this.move.direction === direction
     },
 
     /**
@@ -187,7 +162,7 @@ export default function (Glide, Components, Events) {
   function calculateForwardIndex (viewSize) {
     const { index } = Glide
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index + viewSize
     }
 
@@ -209,7 +184,7 @@ export default function (Glide, Components, Events) {
       return index
     }
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index - (length + 1)
     }
 
@@ -239,7 +214,7 @@ export default function (Glide, Components, Events) {
   function calculateBackwardIndex (viewSize) {
     const { index } = Glide
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index - viewSize
     }
 
@@ -265,7 +240,7 @@ export default function (Glide, Components, Events) {
       return index
     }
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index + (length + 1)
     }
 

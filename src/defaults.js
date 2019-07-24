@@ -11,6 +11,17 @@ export default {
   type: 'slider',
 
   /**
+   * Type of the movement.
+   *
+   * Available types:
+   * `slider` - Rewinds slider to the start/end when it reaches the first or last slide.
+   * `carousel` - Changes slides without starting over when it reaches the first or last slide.
+   *
+   * @type {String}
+   */
+  loop: true,
+
+  /**
    * Start at specific slide number defined with zero-based index.
    *
    * @type {Number}
@@ -23,6 +34,13 @@ export default {
    * @type {Number}
    */
   perView: 1,
+
+  /**
+   * A number of slides visible on the single viewport.
+   *
+   * @type {Number}
+   */
+  perMove: 3,
 
   /**
    * Focus currently active slide at a specified position in the track.
@@ -88,15 +106,11 @@ export default {
   dragThreshold: 120,
 
   /**
-   * A number of slides moved on single swipe.
+   * A maximum number of slides to which movement will be made on swiping or dragging. Use `false` for unlimited.
    *
-   * Available types:
-   * `` - Moves slider by one slide per swipe
-   * `|` - Moves slider between views per swipe (number of slides defined in `perView` options)
-   *
-   * @type {String}
+   * @type {Number|Boolean}
    */
-  perSwipe: '|',
+  perTouch: false,
 
   /**
    * Moving distance ratio of the slides on a swiping and dragging.

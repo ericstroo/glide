@@ -17,6 +17,17 @@ var defaults = {
   type: 'slider',
 
   /**
+   * Type of the movement.
+   *
+   * Available types:
+   * `slider` - Rewinds slider to the start/end when it reaches the first or last slide.
+   * `carousel` - Changes slides without starting over when it reaches the first or last slide.
+   *
+   * @type {String}
+   */
+  loop: true,
+
+  /**
    * Start at specific slide number defined with zero-based index.
    *
    * @type {Number}
@@ -29,6 +40,13 @@ var defaults = {
    * @type {Number}
    */
   perView: 1,
+
+  /**
+   * A number of slides visible on the single viewport.
+   *
+   * @type {Number}
+   */
+  perMove: 3,
 
   /**
    * Focus currently active slide at a specified position in the track.
@@ -94,15 +112,11 @@ var defaults = {
   dragThreshold: 120,
 
   /**
-   * A number of slides moved on single swipe.
+   * A maximum number of slides to which movement will be made on swiping or dragging. Use `false` for unlimited.
    *
-   * Available types:
-   * `` - Moves slider by one slide per swipe
-   * `|` - Moves slider between views per swipe (number of slides defined in `perView` options)
-   *
-   * @type {String}
+   * @type {Number|Boolean}
    */
-  perSwipe: '|',
+  perTouch: false,
 
   /**
    * Moving distance ratio of the slides on a swiping and dragging.
@@ -535,6 +549,8 @@ var EventsBus = function () {
         for (var i = 0; i < event.length; i++) {
           this.on(event[i], handler);
         }
+
+        return;
       }
 
       // Create the event's object if not yet created
@@ -567,6 +583,8 @@ var EventsBus = function () {
         for (var i = 0; i < event.length; i++) {
           this.emit(event[i], context);
         }
+
+        return;
       }
 
       // If the event doesn't exist, or there's no handlers in queue, just leave
@@ -942,7 +960,7 @@ function Run (Glide, Components, Events) {
             Events.emit('run.end', _this.move);
           }
 
-          if (_this.isOffset()) {
+          if (_this.isOffset('<') || _this.isOffset('>')) {
             _this._o = false;
 
             Events.emit('run.offset', _this.move);
@@ -966,10 +984,12 @@ function Run (Glide, Components, Events) {
           length = this.length;
       var steps = move.steps,
           direction = move.direction;
+      var _Glide$settings = Glide.settings,
+          loop = _Glide$settings.loop,
+          perMove = _Glide$settings.perMove;
 
-      // By default assume that size of view is equal to one slide
 
-      var viewSize = 1;
+      var viewSize = steps || perMove;
 
       // While direction is `=` we want jump to
       // a specified index described in steps.
@@ -995,16 +1015,10 @@ function Run (Glide, Components, Events) {
         return;
       }
 
-      // pagination movement
-      if (direction === '|') {
-        viewSize = Glide.settings.perView || 1;
-      }
-
-      // we are moving forward
-      if (direction === '>' || direction === '|' && steps === '>') {
+      if (direction === '>') {
         var index = calculateForwardIndex(viewSize);
 
-        if (index > length) {
+        if (index > length && loop) {
           this._o = true;
         }
 
@@ -1013,11 +1027,10 @@ function Run (Glide, Components, Events) {
         return;
       }
 
-      // we are moving backward
-      if (direction === '<' || direction === '|' && steps === '<') {
+      if (direction === '<') {
         var _index = calculateBackwardIndex(viewSize);
 
-        if (_index < 0) {
+        if (_index < 0 && loop) {
           this._o = true;
         }
 
@@ -1056,28 +1069,8 @@ function Run (Glide, Components, Events) {
      * @param {String} direction
      * @return {Boolean}
      */
-    isOffset: function isOffset() {
-      var direction = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : undefined;
-
-      if (!direction) {
-        return this._o;
-      }
-
-      if (!this._o) {
-        return false;
-      }
-
-      // did we view to the right?
-      if (direction === '|>') {
-        return this.move.direction === '|' && this.move.steps === '>';
-      }
-
-      // did we view to the left?
-      if (direction === '|<') {
-        return this.move.direction === '|' && this.move.steps === '<';
-      }
-
-      return this.move.direction === direction;
+    isOffset: function isOffset(direction) {
+      return this._o && this.move.direction === direction;
     },
 
 
@@ -1101,7 +1094,7 @@ function Run (Glide, Components, Events) {
     var index = Glide.index;
 
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index + viewSize;
     }
 
@@ -1124,7 +1117,7 @@ function Run (Glide, Components, Events) {
       return index;
     }
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index - (length + 1);
     }
 
@@ -1155,7 +1148,7 @@ function Run (Glide, Components, Events) {
     var index = Glide.index;
 
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index - viewSize;
     }
 
@@ -1182,7 +1175,7 @@ function Run (Glide, Components, Events) {
       return index;
     }
 
-    if (Glide.isType('carousel')) {
+    if (Glide.settings.loop) {
       return index + (length + 1);
     }
 
@@ -2512,38 +2505,6 @@ function Translate (Glide, Components, Events) {
      */
     remove: function remove() {
       Components.Html.wrapper.style.transform = '';
-    },
-
-
-    /**
-     * @return {number}
-     */
-    getStartIndex: function getStartIndex() {
-      var length = Components.Sizes.length;
-      var index = Glide.index;
-      var perView = Glide.settings.perView;
-
-      if (Components.Run.isOffset('>') || Components.Run.isOffset('|>')) {
-        return length + (index - perView);
-      }
-
-      // "modulo length" converts an index that equals length to zero
-      return (index + perView) % length;
-    },
-
-
-    /**
-     * @return {number}
-     */
-    getTravelDistance: function getTravelDistance() {
-      var travelDistance = Components.Sizes.slideWidth * Glide.settings.perView;
-
-      if (Components.Run.isOffset('>') || Components.Run.isOffset('|>')) {
-        // reverse travel distance so that we don't have to change subtract operations
-        return travelDistance * -1;
-      }
-
-      return travelDistance;
     }
   };
 
@@ -2553,18 +2514,31 @@ function Translate (Glide, Components, Events) {
    * - on updating via API to reflect possible changes in options
    */
   Events.on('move', function (context) {
-    if (!Glide.isType('carousel') || !Components.Run.isOffset()) {
-      return Translate.set(context.movement);
+    var gap = Components.Gaps.value;
+    var length = Components.Sizes.length;
+    var width = Components.Sizes.slideWidth;
+
+    if (Glide.settings.loop && Components.Run.isOffset('<')) {
+      Components.Transition.after(function () {
+        Events.emit('translate.jump');
+
+        Translate.set(width * (length - 1));
+      });
+
+      return Translate.set(-width - gap * length);
     }
 
-    Components.Transition.after(function () {
-      Events.emit('translate.jump');
+    if (Glide.settings.loop && Components.Run.isOffset('>')) {
+      Components.Transition.after(function () {
+        Events.emit('translate.jump');
 
-      Translate.set(Components.Sizes.slideWidth * Glide.index);
-    });
+        Translate.set(0);
+      });
 
-    var startWidth = Components.Sizes.slideWidth * Components.Translate.getStartIndex();
-    return Translate.set(startWidth - Components.Translate.getTravelDistance());
+      return Translate.set(width * length + gap * length);
+    }
+
+    return Translate.set(context.movement);
   });
 
   /**
@@ -2675,7 +2649,7 @@ function Transition (Glide, Components, Events) {
     get: function get() {
       var settings = Glide.settings;
 
-      if (Glide.isType('slider') && Components.Run.offset) {
+      if (!settings.loop && Components.Run.offset) {
         return settings.rewindDuration;
       }
 
@@ -2843,30 +2817,45 @@ function Swipe (Glide, Components, Events) {
      */
     end: function end(event) {
       if (!Glide.disabled) {
-        var _Glide$settings2 = Glide.settings,
-            perSwipe = _Glide$settings2.perSwipe,
-            touchAngle = _Glide$settings2.touchAngle,
-            classes = _Glide$settings2.classes;
-
+        var settings = Glide.settings;
 
         var swipe = this.touches(event);
         var threshold = this.threshold(event);
 
         var swipeDistance = swipe.pageX - swipeStartX;
         var swipeDeg = swipeSin * 180 / Math.PI;
+        var steps = Math.round(swipeDistance / Components.Sizes.slideWidth);
 
         this.enable();
 
-        if (swipeDistance > threshold && swipeDeg < touchAngle) {
-          Components.Run.make(Components.Direction.resolve(perSwipe + '<'));
-        } else if (swipeDistance < -threshold && swipeDeg < touchAngle) {
-          Components.Run.make(Components.Direction.resolve(perSwipe + '>'));
+        if (swipeDistance > threshold && swipeDeg < settings.touchAngle) {
+          // While swipe is positive and greater than threshold move backward.
+          if (settings.perTouch) {
+            steps = Math.min(steps, toInt(settings.perTouch));
+          }
+
+          if (Components.Direction.is('rtl')) {
+            steps = -steps;
+          }
+
+          Components.Run.make(Components.Direction.resolve('<' + steps));
+        } else if (swipeDistance < -threshold && swipeDeg < settings.touchAngle) {
+          // While swipe is negative and lower than negative threshold move forward.
+          if (settings.perTouch) {
+            steps = Math.max(steps, -toInt(settings.perTouch));
+          }
+
+          if (Components.Direction.is('rtl')) {
+            steps = -steps;
+          }
+
+          Components.Run.make(Components.Direction.resolve('>' + steps));
         } else {
           // While swipe don't reach distance apply previous transform.
           Components.Move.make();
         }
 
-        Components.Html.root.classList.remove(classes.dragging);
+        Components.Html.root.classList.remove(settings.classes.dragging);
 
         this.unbindSwipeMove();
         this.unbindSwipeEnd();
@@ -2884,18 +2873,15 @@ function Swipe (Glide, Components, Events) {
     bindSwipeStart: function bindSwipeStart() {
       var _this = this;
 
-      var _Glide$settings3 = Glide.settings,
-          swipeThreshold = _Glide$settings3.swipeThreshold,
-          dragThreshold = _Glide$settings3.dragThreshold;
+      var settings = Glide.settings;
 
-
-      if (swipeThreshold) {
+      if (settings.swipeThreshold) {
         Binder.on(START_EVENTS[0], Components.Html.wrapper, function (event) {
           _this.start(event);
         }, capture);
       }
 
-      if (dragThreshold) {
+      if (settings.dragThreshold) {
         Binder.on(START_EVENTS[1], Components.Html.wrapper, function (event) {
           _this.start(event);
         }, capture);
@@ -3517,12 +3503,15 @@ function Keyboard (Glide, Components, Events) {
      * @return {Void}
      */
     press: function press(event) {
+      var perSwipe = Glide.settings.perSwipe;
+
+
       if (event.keyCode === 39) {
-        Components.Run.make(Components.Direction.resolve('>'));
+        Components.Run.make(Components.Direction.resolve(perSwipe + '>'));
       }
 
       if (event.keyCode === 37) {
-        Components.Run.make(Components.Direction.resolve('<'));
+        Components.Run.make(Components.Direction.resolve(perSwipe + '<'));
       }
     }
   };
@@ -3595,6 +3584,8 @@ function Autoplay (Glide, Components, Events) {
             Components.Run.make('>');
 
             _this.start();
+
+            Events.emit('autoplay');
           }, this.time);
         }
       }
@@ -3619,12 +3610,16 @@ function Autoplay (Glide, Components, Events) {
     bind: function bind() {
       var _this2 = this;
 
-      Binder.on('mouseover', Components.Html.root, function () {
+      Binder.on('mouseenter', Components.Html.root, function () {
         _this2.stop();
+
+        Events.emit('autoplay.enter');
       });
 
-      Binder.on('mouseout', Components.Html.root, function () {
+      Binder.on('mouseleave', Components.Html.root, function () {
         _this2.start();
+
+        Events.emit('autoplay.leave');
       });
     },
 
